@@ -1,7 +1,21 @@
 @import "tailwindcss";
 
+/* Smooth scrolling and reduced motion */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Base styles */
 * {
   font-family: var(--font-mazzard);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 :root {
@@ -32,6 +46,12 @@ input:-webkit-autofill:active {
   -webkit-text-fill-color: #fff !important;
 }
 
+/* Optimize rendering */
+* {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
 @layer utilities {
   .task-status {
     @apply px-2 py-1 text-xs rounded-full;
@@ -47,9 +67,28 @@ input:-webkit-autofill:active {
   }
 }
 
-/* .logo {
-  font-family: var(--font-radis);
-} */
+/* Page transition animations */
+.fade-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.fade-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+.fade-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.fade-exit-active {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 300ms, transform 300ms;
+}
 
 .nav-hover::after {
   content: "";

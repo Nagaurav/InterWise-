@@ -6,6 +6,7 @@ import Image from "next/image";
 import Script from "next/script";
 import NavBarWrapper from "@/components/NavBarWrapper";
 import { AuthProvider } from "@/context/AuthContext";
+import PageTransition from "@/components/ui/PageTransition";
 
 const mazzard = localfont({
   src: [
@@ -55,23 +56,33 @@ export default function RootLayout({
         <script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
         <script src="https://files.bpcontent.cloud/2025/04/19/09/20250419094324-XVRD1UY2.js" defer></script>
       </head>
-      <body className={`${mazzard.variable} ${radis.variable} font-sans`}>
+      <body className={`${mazzard.variable} ${radis.variable} font-sans antialiased`}>
         <AuthProvider>
-          <div className="absolute left-0 -top-30 -z-10">
-            <Image width={700} height={700} src="/images/bg-shade.png" alt="" style={{width: 'auto'}} />
+          <div className="fixed left-0 -top-30 -z-10 w-auto h-auto">
+            <Image 
+              width={700} 
+              height={700} 
+              src="/images/bg-shade.png" 
+              alt="Background decoration" 
+              style={{width: 'auto', height: 'auto'}}
+              priority 
+            />
           </div>
-          <div className="absolute right-0 -z-10">
+          <div className="fixed right-0 bottom-0 -z-10 w-auto h-auto">
             <Image
               className="bottom-0 right-0 -z-10"
               width={700}
               height={700}
               src="/images/bg-shade2.png"
-              alt=""
-              style={{width: 'auto'}}
+              alt="Background decoration"
+              style={{width: 'auto', height: 'auto'}}
+              priority
             />
           </div>
           <NavBarWrapper />
-          {children}
+          <PageTransition>
+            {children}
+          </PageTransition>
         </AuthProvider>
       </body>
     </html>
