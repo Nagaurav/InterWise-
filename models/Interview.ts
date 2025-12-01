@@ -20,27 +20,12 @@ const questionSchema = new mongoose.Schema({
   },
 });
 
-const learningResourceSchema = new mongoose.Schema({
-  title: String,
-  url: String,
-  type: {
-    type: String,
-    enum: ['article', 'video', 'course', 'documentation']
-  },
-  description: String
-});
-
 const feedbackSchema = new mongoose.Schema({
   overallFeedback: String,
   strengths: [String],
   areasForImprovement: [String],
-  nextSteps: [String],
-  learningResources: {
-    type: Map,
-    of: [learningResourceSchema],
-    default: {}
-  }
-});
+  nextSteps: [String]
+}, { _id: false });
 
 const recordingSchema = new mongoose.Schema({
   url: {

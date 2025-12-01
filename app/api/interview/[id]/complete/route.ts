@@ -6,10 +6,9 @@ import { generateInterviewFeedback } from "@/lib/gemini";
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // const { id } = params;
     await connectDB();
 
     // get token from authorization header
@@ -26,7 +25,7 @@ export async function POST(
     const userId = getUserIdFromToken(token);
 
     // get interview id from params
-    const interviewId = params.id;
+    const { id: interviewId } = await params;
     console.log(`Completing interview: ${interviewId}`);
 
     //find the interview
@@ -80,12 +79,6 @@ export async function POST(
     // generate overall feedback using gemini
     const feedback = await generateInterviewFeedback(interview);
     console.log("Feedback generated successfully", JSON.stringify(feedback, null, 2));
-
-    // Ensure learningResources exists in feedback
-    if (!feedback.learningResources) {
-      feedback.learningResources = {};
-      console.warn("No learningResources in feedback, initializing empty object");
-    }
 
     // update the interview with the overall score and feedback
     interview.overallScore = overallScore;

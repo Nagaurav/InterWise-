@@ -16,8 +16,6 @@ const OverviewTabData = ({
       <h2 className="text-xl font-bold mb-4">Overall Performance</h2>
 
       <div className="flex flex-col items-center justify-center mb-6">
-        <div>image here</div>
-
         <div
           className={`text-2xl mt-4 font-bold ${scoreColor(
             interview.overallScore

@@ -349,15 +349,28 @@ export default function InterviewSession({
       );
 
       if (!completeRes.ok) {
-        const errorData = await completeRes.json();
-        if (errorData.unansweredCount) {
+        let errorData;
+        try {
+          errorData = await completeRes.json();
+          console.error('Complete interview API error:', errorData);
+          
+          if (errorData.unansweredCount) {
+            throw new Error(
+              `Please answer all ${errorData.unansweredCount} remaining questions before submitting.`
+            );
+          }
+          
+          // If we have an error message from the server, use it
+          const errorMessage = errorData.error || errorData.message || 'Unknown server error';
           throw new Error(
-            `Please answer all ${errorData.unansweredCount} remaining questions before submitting.`
+            `Failed to complete interview: ${errorMessage}. Please try again.`
+          );
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+          throw new Error(
+            `Failed to complete interview (status: ${completeRes.status}). Please try again.`
           );
         }
-        throw new Error(
-          errorData.message || "Failed to complete interview. Please try again."
-        );
       }
 
       // Update the interview status

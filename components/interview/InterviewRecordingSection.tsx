@@ -8,10 +8,7 @@ interface InterviewRecordingSectionProps {
   className?: string;
 }
 
-/**
- * Video response functionality is currently disabled.
- * This component is kept as a placeholder for future implementation.
- */
+
 const InterviewRecordingSection = ({
   interviewId,
   onRecordingComplete,

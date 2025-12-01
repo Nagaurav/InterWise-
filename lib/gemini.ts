@@ -57,7 +57,7 @@ interface AnalysisResult {
 interface LearningResource {
   title: string;
   url: string;
-  type: 'article' | 'video' | 'course' | 'documentation';
+  type: 'article' | 'video' | 'course' | 'documentation' | 'tutorial' | 'forum';
   description: string;
 }
 
@@ -66,9 +66,6 @@ interface FeedbackResult {
   strengths: string[];
   areasForImprovement: string[];
   nextSteps: string[];
-  learningResources: {
-    [key: string]: LearningResource[];
-  };
 }
 
 export const generateInterviewQuestions = async (
@@ -243,13 +240,6 @@ export const generateInterviewFeedback = async (
     2. Key strengths demonstrated
     3. Areas needing improvement
     4. Actionable next steps for growth
-    5. Curated learning resources for each area of improvement
-    
-    For learning resources, include:
-    - 2-3 high-quality resources per major area of improvement
-    - Mix of articles, documentation, and video tutorials
-    - Resources from reputable sources (MDN, official docs, freeCodeCamp, etc.)
-    - Direct links to the resources
     
     Return valid JSON format:
     {
@@ -262,7 +252,7 @@ export const generateInterviewFeedback = async (
           {
             "title": "Resource Title",
             "url": "https://example.com/resource",
-            "type": "article|video|course|documentation",
+            "type": "article|video|course|documentation|tutorial|forum",
             "description": "Brief description of what the resource covers"
           }
         ]
@@ -292,40 +282,7 @@ export const generateInterviewFeedback = async (
       throw new Error("Invalid feedback format from API");
     }
 
-    // Ensure learningResources exists and is properly formatted
-    if (!parsed.learningResources || typeof parsed.learningResources !== 'object') {
-      console.warn('No learningResources in feedback, initializing empty object');
-      parsed.learningResources = {};
-    }
-
-    // Validate each learning resource
-    for (const [topic, resources] of Object.entries(parsed.learningResources)) {
-      if (!Array.isArray(resources)) {
-        console.warn(`Invalid resources format for topic: ${topic}`);
-        parsed.learningResources[topic] = [];
-        continue;
-      }
-
-      // Filter out invalid resources
-      parsed.learningResources[topic] = resources.filter((resource: any) => {
-        const isValid = 
-          resource && 
-          typeof resource.title === 'string' &&
-          typeof resource.url === 'string' &&
-          ['article', 'video', 'course', 'documentation'].includes(resource.type) &&
-          typeof resource.description === 'string';
-        
-        if (!isValid) {
-          console.warn('Invalid resource format:', resource);
-        }
-        return isValid;
-      });
-    }
-
-    console.log('Processed feedback with learning resources:', {
-      topics: Object.keys(parsed.learningResources),
-      resourcesCount: Object.values(parsed.learningResources).flat().length
-    });
+    console.log('Processed feedback successfully');
 
     return parsed;
   } catch (error) {
