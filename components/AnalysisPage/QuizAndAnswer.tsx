@@ -10,7 +10,7 @@ interface QuizAndAnswerProps {
 }
 
 const QuizAndAnswer = ({ activeQuestionIndex, activeQuestion, interview, onClick }: QuizAndAnswerProps) => {
-  const score = activeQuestion.analysis && activeQuestion.answer ? activeQuestion.analysis.score : null;
+  const score = typeof activeQuestion.analysis?.score === "number" ? activeQuestion.analysis.score : null;
 
   return (
     <div className="p-8 bg border border-[#352a31] rounded-2xl max-sm:p-6">
@@ -43,7 +43,9 @@ const QuizAndAnswer = ({ activeQuestionIndex, activeQuestion, interview, onClick
           <p className="leading-relaxed text-gray-300 whitespace-pre-line">{activeQuestion.answer}</p>
         ) : (
           <div className="py-4 text-center">
-            <p className="mb-4 italic text-zinc-400">No answer provided yet</p>
+            <p className="mb-4 italic text-zinc-400">
+              {interview.status === "completed" ? "No answer was given for this question, so it scored 0." : "No answer provided yet"}
+            </p>
             {interview.status === "in-progress" && (
               <button
                 onClick={onClick}

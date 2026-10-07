@@ -295,6 +295,11 @@ const NewInterviewForm = ({ onClose, onStartInterview }: NewInterviewFormProps) 
               Cancel
             </button>
           </div>
+          {status.isSubmitting && (
+            <p className="text-xs text-center text-zinc-500">
+              Generating personalized questions from your details. This can take up to a minute.
+            </p>
+          )}
         </div>
       </form>
 

@@ -11,7 +11,7 @@ const ScoreChip = ({ question }: { question: any }) => {
   if (!question.answer) {
     return <span className="px-2 py-0.5 text-[10px] rounded-full bg-zinc-800 text-zinc-500 shrink-0">Not answered</span>;
   }
-  if (!question.analysis) return null;
+  if (typeof question.analysis?.score !== "number") return null;
   const score = question.analysis.score;
   return (
     <span
@@ -30,7 +30,7 @@ const QuestionList = ({ interview, onClick, activeQuestionIndex }: QuestionListP
       <div className="flex gap-2 pb-2 -mx-6 px-6 overflow-x-auto md:hidden">
         {interview.questions.map((question: any, index: number) => {
           const active = activeQuestionIndex === index;
-          const score = question.answer && question.analysis ? question.analysis.score : null;
+          const score = question.answer && typeof question.analysis?.score === "number" ? question.analysis.score : null;
           return (
             <button
               key={index}

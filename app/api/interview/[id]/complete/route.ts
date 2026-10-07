@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import Interview from "@/models/Interview";
 import { getUserIdFromToken } from "@/lib/auth";
 import { generateInterviewFeedback } from "@/lib/gemini";
+import { analyzeMissingAnswers, markUnansweredQuestions } from "@/lib/interviewScore";
 
 export async function POST(
   req: Request,
@@ -29,7 +30,7 @@ export async function POST(
     console.log(`Completing interview: ${interviewId}`);
 
     //find the interview
-    const interview = await Interview.findById(interviewId);
+    let interview = await Interview.findById(interviewId);
     if (!interview) {
       return NextResponse.json(
         { message: "Interview not found" },
@@ -42,36 +43,23 @@ export async function POST(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    // check if all questions have answers
-    const unansweredQuestions = interview.questions.filter(
-      (q: any) => !q.answer || q.answer.trim() === ""
+    // Unanswered questions (e.g. skipped by the inactivity timer) don't block completion:
+    // they are recorded as "no answer given" and score 0
+    const skippedCount = await markUnansweredQuestions(interviewId);
+    if (skippedCount > 0) console.log(`${skippedCount} unanswered question(s) scored 0`);
+
+    // Answers are analyzed in the background when saved; make sure none are still missing
+    // (e.g. the last answer, submitted just before this) so the score and feedback cover them all
+    await analyzeMissingAnswers(interviewId);
+    interview = (await Interview.findById(interviewId))!;
+
+    // Overall score: average over all questions (unanswered ones count as 0)
+    const scores = interview.questions.map((q: any) =>
+      typeof q.analysis?.score === "number" ? q.analysis.score : 0
     );
-    if (unansweredQuestions.length > 0) {
-      return NextResponse.json(
-        {
-          message:
-            "All questions must be answered before completing the interview",
-          unansweredCount: unansweredQuestions.length,
-        },
-        { status: 400 }
-      );
-    }
-
-    // calculate the overall score based on the individual question scores
-    const totalQuestions = interview.questions.length;
-    let answeredQuestions = 0;
-    let totalScore = 0;
-
-    for (const question of interview.questions) {
-      if (question.answer && question.analysis && question.analysis.score) {
-        totalScore += question.analysis.score;
-        answeredQuestions++;
-      }
-    }
-
-    // calculate the average score
-    const overallScore =
-      answeredQuestions > 0 ? Math.round(totalScore / answeredQuestions) : 0;
+    const overallScore = scores.length
+      ? Math.round(scores.reduce((sum: number, score: number) => sum + score, 0) / scores.length)
+      : 0;
     console.log(
       `Generating feedback for interview with overall score: ${overallScore}`
     );

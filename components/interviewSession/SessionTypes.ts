@@ -16,6 +16,7 @@ export interface Question {
 }
 
 export interface Interview {
+  usedFallbackQuestions?: boolean;
   _id: string;
   title: string;
   description?: string;

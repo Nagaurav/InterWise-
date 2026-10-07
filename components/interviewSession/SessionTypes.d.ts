@@ -43,6 +43,7 @@ export interface Question {
 }
 
 export interface Interview {
+  usedFallbackQuestions?: boolean;
   _id: string;
   jobRole: string;
   techStack: string[];

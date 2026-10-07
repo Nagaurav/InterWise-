@@ -2,45 +2,89 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-// Configure for Flash model
+// Model is configurable via GEMINI_MODEL. The default is Google's auto-updating Flash alias, because
+// pinned versions get retired (gemini-2.0-flash started returning 404, which silently forced the
+// generic fallback questions).
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
+
 const generationConfig = {
   temperature: 0.7,
   topP: 1,
   topK: 32,
-  maxOutputTokens: 2000,
+  // Newer Flash models spend part of this budget on internal reasoning, so 2000 could cut the JSON short
+  maxOutputTokens: 8192,
+  // Every call here expects a JSON object back
+  responseMimeType: "application/json",
 };
 
-// Retry configuration
-const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY = 2000;
+// Models to try in order. If one is overloaded (503), retired (404) or hangs, the next one is used
+// before giving up and falling back to the generic questions. The last entry is a fast "lite" model
+// that stays available when the bigger ones are under heavy demand.
+const MODEL_CHAIN = Array.from(
+  new Set([GEMINI_MODEL, "gemini-3.5-flash", "gemini-flash-lite-latest"])
+);
+
+const REQUEST_TIMEOUT = 40_000; // one call; a hung model must not use up the whole budget
+const TOTAL_DEADLINE = 120_000; // all attempts together, so the user isn't left waiting indefinitely
+const RETRY_DELAY = 2000;
+// Rate limits and transient server errors are worth one more try on the same model.
+// Overload (503), retirement (404) and timeouts move on to the next model instead.
+const RETRY_SAME_MODEL_STATUSES = [429, 500];
+
+// Models that recently failed (overloaded, timed out, retired) are skipped for a while instead of
+// being waited on again on every call. Lives in server memory, so it resets on restart.
+const UNHEALTHY_FOR_MS = 5 * 60_000;
+const unhealthyUntil = new Map<string, number>();
+const markUnhealthy = (modelName: string, error: any) => {
+  const retired = error?.status === 404;
+  unhealthyUntil.set(modelName, Date.now() + (retired ? 60 * 60_000 : UNHEALTHY_FOR_MS));
+};
 
 /**
- * Helper function to implement exponential backoff for API calls
+ * Calls Gemini, retrying transient errors and falling through MODEL_CHAIN when a model is unusable.
  */
-const retryWithExponentialBackoff = async <T>(
-  fn: () => Promise<T>,
-  retries = MAX_RETRIES,
-  delay = INITIAL_RETRY_DELAY
-): Promise<T> => {
-  try {
-    return await fn();
-  } catch (error: any) {
-    // Check if it's a rate limit error (429)
-    if (retries > 0 && error?.status === 429) {
-      console.log(
-        `Rate limit exceeded. Retrying in ${delay}ms... (${retries} retries left)`
+const generateWithFallback = async (prompt: string) => {
+  const startedAt = Date.now();
+  let lastError: any;
+
+  // Healthy models first, in chain order; recently failed ones only as a last resort
+  const now = Date.now();
+  const healthy = MODEL_CHAIN.filter((m) => (unhealthyUntil.get(m) ?? 0) <= now);
+  const models = [...healthy, ...MODEL_CHAIN.filter((m) => !healthy.includes(m))];
+
+  for (const modelName of models) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const remaining = TOTAL_DEADLINE - (Date.now() - startedAt);
+      if (remaining <= 1000) {
+        throw lastError ?? new Error("Gemini request deadline exceeded");
+      }
+
+      const model = genAI.getGenerativeModel(
+        { model: modelName, generationConfig },
+        { timeout: Math.min(REQUEST_TIMEOUT, remaining) }
       );
 
-      // Wait for the specified delay
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      try {
+        const result = await model.generateContent(prompt);
+        unhealthyUntil.delete(modelName);
+        if (modelName !== MODEL_CHAIN[0]) console.log(`Gemini: succeeded with fallback model ${modelName}`);
+        return result;
+      } catch (error: any) {
+        lastError = error;
+        const status = error?.status;
+        console.warn(`Gemini ${modelName} attempt ${attempt} failed (${status ?? error?.name ?? "error"})`);
 
-      // Retry with increased delay (exponential backoff)
-      return retryWithExponentialBackoff(fn, retries - 1, delay * 2);
+        if (attempt === 1 && RETRY_SAME_MODEL_STATUSES.includes(status)) {
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+          continue;
+        }
+        markUnhealthy(modelName, error);
+        break; // try the next model
+      }
     }
-
-    // If it's not a rate limit error or we've exhausted retries, throw the error
-    throw error;
   }
+
+  throw lastError ?? new Error("All Gemini models failed");
 };
 
 interface GeneratedQuestions {
@@ -72,11 +116,6 @@ export const generateInterviewQuestions = async (
   context: string
 ): Promise<string[]> => {
   try {
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      generationConfig,
-    });
-
     const prompt = `You are an expert technical interviewer. Generate 15 interview questions based on the provided context:
 
 ${context}
@@ -134,9 +173,7 @@ OUTPUT RULES:
 
 Now generate the questions based on the available content.`;
 
-    const result = await retryWithExponentialBackoff(() =>
-      model.generateContent(prompt)
-    );
+    const result = await generateWithFallback(prompt);
 
     const text = await result.response.text();
 
@@ -163,11 +200,6 @@ export const analyzeResponse = async (
   answer: string
 ): Promise<AnalysisResult> => {
   try {
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      generationConfig,
-    });
-
     const prompt = `Analyze this interview response (1-100 score) considering:
       - Technical accuracy (40%)
       - Communication clarity (30%)
@@ -186,9 +218,7 @@ export const analyzeResponse = async (
       }`;
 
     // Use retry mechanism for API call
-    const result = await retryWithExponentialBackoff(() =>
-      model.generateContent(prompt)
-    );
+    const result = await generateWithFallback(prompt);
 
     const text = await result.response.text();
 
@@ -220,18 +250,13 @@ export const generateInterviewFeedback = async (
   interview: any
 ): Promise<FeedbackResult> => {
   try {
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      generationConfig,
-    });
-
     // Prepare the interview data for the prompt
     const questionsAndAnswers = interview.questions
       .map((q: any, index: number) => {
         return `
       Question ${index + 1}: ${q.text}
       Answer: ${q.answer || "No answer provided"}
-      Score: ${q.analysis?.score || "N/A"}
+      Score: ${q.analysis?.score ?? "N/A"}
       Technical Feedback: ${q.analysis?.technicalFeedback || "N/A"}
       Communication Feedback: ${q.analysis?.communicationFeedback || "N/A"}
       `;
@@ -271,9 +296,7 @@ export const generateInterviewFeedback = async (
       }
     }`;
 
-    const result = await retryWithExponentialBackoff(() =>
-      model.generateContent(prompt)
-    );
+    const result = await generateWithFallback(prompt);
 
     const text = await result.response.text();
 

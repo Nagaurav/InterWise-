@@ -178,10 +178,11 @@ export default function AnalysisPage({ params }: AnalysisProps) {
               activeQuestionIndex={activeQuestionIndex}
             />
 
-            {activeQuestion.answer ? (
-              activeQuestion.analysis ? (
-                <AnswerAnalysis activeQuestion={activeQuestion} />
-              ) : (
+            {/* skipped questions of a finished interview also have an analysis (score 0) */}
+            {typeof activeQuestion.analysis?.score === "number" ? (
+              <AnswerAnalysis activeQuestion={activeQuestion} />
+            ) : activeQuestion.answer ? (
+              (
                 <div className="p-8 text-center bg border border-[#352a31] rounded-2xl">
                   <Hourglass className="w-6 h-6 mx-auto mb-3 text-[var(--theme-hover)]" />
                   <p className="mb-1 text-gray-300">Analysis is being generated for this question.</p>

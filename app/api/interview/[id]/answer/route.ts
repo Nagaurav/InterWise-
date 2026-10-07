@@ -1,8 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Interview from "@/models/Interview";
 import { getUserIdFromToken } from "@/lib/auth";
 import { analyzeResponse } from "@/lib/gemini";
+import { recalculateOverallScore } from "@/lib/interviewScore";
+
+// Fields the interview session needs back after a save
+const interviewPayload = (interview: any) => ({
+  _id: interview._id,
+  jobRole: interview.jobRole,
+  techStack: interview.techStack,
+  yearsOfExperience: interview.yearsOfExperience,
+  questions: interview.questions,
+  overallScore: interview.overallScore,
+  status: interview.status,
+  usedFallbackQuestions: interview.usedFallbackQuestions,
+  createdAt: interview.createdAt,
+});
 
 export async function POST(
   request: NextRequest,
@@ -104,75 +118,60 @@ export async function POST(
       );
     }
 
-    // analyze the answer using Gemini
-    try {
-      console.log(
-        `Analyzing answer for question ${questionIndex}: "${answer.substring(
-          0,
-          50
-        )}..."`
-      );
-      const question = interview.questions[questionIndex].text;
-      const analysis = await analyzeResponse(question, answer);
-      console.log(`Analysis complete with score: ${analysis.score}`);
+    // Save the answer right away and analyze it in the background. Waiting for the AI here made
+    // every "Submit Answer" take 10-45s; the analysis is only needed later on the results pages.
+    const trimmedAnswer = String(answer).trim();
 
-      // update the interview with the answer and analysis
-      interview.questions[questionIndex].answer = answer;
-      interview.questions[questionIndex].analysis = analysis;
-
-      // calculate the current overall score based on answered questions
-      let totalScore = 0;
-      let answeredQuestions = 0;
-
-      for (const question of interview.questions) {
-        if (question.answer && question.analysis && question.analysis.score) {
-          totalScore += question.analysis.score;
-          answeredQuestions++;
-        }
-      }
-
-      // update the overall score
-      if (answeredQuestions > 0) {
-        interview.overallScore = Math.round(totalScore / answeredQuestions);
-      }
-
-      // save the updated interview
-      await interview.save();
-      console.log(
-        `Interview updated successfully for question: ${questionIndex}`
-      );
-
-      // return the updated interview data
+    // Unchanged answer that already has its analysis (e.g. re-saved when moving between questions):
+    // nothing to do, and no reason to throw that analysis away
+    const existing = interview.questions[questionIndex];
+    // (analysis is a nested object that Mongoose returns as {} when empty, so check for a real score)
+    if (existing.answer === trimmedAnswer && typeof existing.analysis?.score === "number") {
       return NextResponse.json(
-        {
-          message: "Answer submitted successfully",
-          analysis,
-          interview: {
-            _id: interview._id,
-            jobRole: interview.jobRole,
-            techStack: interview.techStack,
-            yearsOfExperience: interview.yearsOfExperience,
-            questions: interview.questions,
-            overallScore: interview.overallScore,
-            status: interview.status,
-            createdAt: interview.createdAt,
-          },
-        },
+        { message: "Answer unchanged", interview: interviewPayload(interview) },
         { status: 200 }
       );
-    } catch (analysisError) {
-      console.error("Error during answer analysis:", analysisError);
-      return NextResponse.json(
-        {
-          message: "Error analyzing answer",
-          error:
-            analysisError instanceof Error
-              ? analysisError.message
-              : "Unknown analysis error",
-        },
-        { status: 500 }
-      );
     }
+    const updated = await Interview.findOneAndUpdate(
+      { _id: interviewId },
+      {
+        $set: {
+          [`questions.${questionIndex}.answer`]: trimmedAnswer,
+          [`questions.${questionIndex}.analysis`]: null, // replaced once the new analysis is ready
+        },
+      },
+      { new: true }
+    );
+    console.log(`Answer saved for question ${questionIndex}; analysis queued`);
+
+    const questionText = interview.questions[questionIndex].text;
+    after(async () => {
+      try {
+        const analysis = await analyzeResponse(questionText, trimmedAnswer);
+        // Only store it if the answer hasn't been changed again in the meantime
+        const result = await Interview.updateOne(
+          { _id: interviewId, [`questions.${questionIndex}.answer`]: trimmedAnswer },
+          { $set: { [`questions.${questionIndex}.analysis`]: analysis } }
+        );
+        if (result.modifiedCount === 0) {
+          console.log(`Analysis for question ${questionIndex} discarded: answer changed meanwhile`);
+          return;
+        }
+        await recalculateOverallScore(interviewId);
+        console.log(`Background analysis stored for question ${questionIndex} (score ${analysis.score})`);
+      } catch (analysisError) {
+        // The interview completion step re-analyzes any answer that is still missing an analysis
+        console.error(`Background analysis failed for question ${questionIndex}:`, analysisError);
+      }
+    });
+
+    return NextResponse.json(
+      {
+        message: "Answer submitted successfully",
+        interview: interviewPayload(updated),
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Error in answer submission route:", error);
 
