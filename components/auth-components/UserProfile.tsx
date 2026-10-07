@@ -53,7 +53,7 @@ const UserProfile = () => {
                 height={15}
                 src="/images/Vector.svg"
                 alt="user-img"
-                style={{height: 'auto'}}
+                style={{ width: 'auto', height: 'auto' }}
               />
             )}
           </div>

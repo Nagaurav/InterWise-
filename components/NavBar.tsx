@@ -12,10 +12,10 @@ const NavBar = () => {
   const { isAuthenticated } = useAuth();
 
   return (
-    <nav className="min-h-[100px] items-center flex sm:px-10 px-8 justify-between">
+    <nav className="relative z-40 min-h-[100px] items-center flex sm:px-10 px-8 justify-between">
       <div className="flex items-center gap-3">
         <Link href={"/"} className="flex items-center gap-3">
-          <Image width={35} height={35} src="/images/logo.svg" alt="Logo" style={{height: 'auto'}} />
+          <Image width={35} height={35} src="/images/logo.svg" alt="Logo" style={{ width: 'auto', height: 'auto' }} />
           <h2 className="text-2xl font-medium text-white sm:text-3xl">
             interwise
           </h2>
@@ -52,9 +52,7 @@ const NavBar = () => {
         {isAuthenticated ? (
           <UserProfile />
         ) : (
-          <Link href="/login">
-            <Button name="Let's Talk" />
-          </Link>
+          <Button href="/login" name="Let's Talk" />
         )}
       </div>
     </nav>

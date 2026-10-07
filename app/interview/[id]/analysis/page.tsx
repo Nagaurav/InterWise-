@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Loader from "@/components/Loader";
 import ErrorInterview from "@/components/errors/ErrorInterview";
-import MainButton from "@/components/AnalysisPage/MainButton";
+import { AlertCircle, ArrowLeft, Hourglass, PlayCircle } from "lucide-react";
 import QuestionList from "@/components/AnalysisPage/QuestionList";
 import QuizAndAnswer from "@/components/AnalysisPage/QuizAndAnswer";
 import AnswerAnalysis from "@/components/AnalysisPage/AnswerAnalysis";
@@ -23,13 +23,15 @@ export default function AnalysisPage({ params }: AnalysisProps) {
   const { id: interviewId } = use(params);
 
   const router = useRouter();
-  const { getToken, isAuthenticated } = useAuth();
+  const { getToken, isAuthenticated, authLoading } = useAuth();
   const [interview, setInterview] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (authLoading) return;
     // Fetch interview data
     const fetchInterview = async () => {
       try {
@@ -82,28 +84,15 @@ export default function AnalysisPage({ params }: AnalysisProps) {
     if (isAuthenticated !== null) {
       fetchInterview();
     }
-  }, [interviewId, router, isAuthenticated, getToken]);
+  }, [interviewId, router, isAuthenticated, getToken, authLoading]);
 
-  // logic for marks data
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-500";
-    if (score >= 60) return "text-yellow-500";
-    return "text-red-500";
-  };
-
-  const getScoreBackground = (score: number) => {
-    if (score >= 80) return "bg-green-900/20";
-    if (score >= 60) return "bg-yellow-900/20";
-    return "bg-red-900/20";
-  };
-
-  const getScoreLabel = (score: number) => {
-    if (score >= 90) return "Excellent";
-    if (score >= 80) return "Very Good";
-    if (score >= 70) return "Good";
-    if (score >= 60) return "Satisfactory";
-    if (score >= 50) return "Needs Improvement";
-    return "Poor";
+  // switch question and bring the start of its content into view
+  const goToQuestion = (index: number) => {
+    setActiveQuestionIndex(index);
+    const top = contentRef.current?.getBoundingClientRect().top;
+    if (top !== undefined && top < 0) {
+      contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   };
 
   if (loading) {
@@ -124,127 +113,114 @@ export default function AnalysisPage({ params }: AnalysisProps) {
   }
 
   const activeQuestion = interview.questions[activeQuestionIndex];
+  const isInProgress = interview.status === "in-progress";
+  const continueInterview = () => router.push(`/interview/${interviewId}`);
 
   return (
     <>
       <InterviewNav interview={interview} />
-      <div className="text-white container mx-auto py-6 px-1 max-w-[90%]">
-        {/* heading and message */}
-        <div className="flex max-sm:flex-col max-sm:gap-6 max-sm:text-center justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold">Questions Analysis</h1>
-            {interview.status === "in-progress" && (
-              <p className="text-sm max-sm:text-xs max-sm:px-14 text-amber-600 mt-1">
-                This interview is still in progress. Analysis is only available
-                for answered questions.
+      <div className="px-10 pt-10 pb-16 mx-auto text-white max-w-7xl max-sm:px-6">
+        {/* heading and actions */}
+        <div className="flex items-end justify-between gap-6 mb-8 max-md:flex-col max-md:items-center max-md:text-center">
+          <div className="flex flex-col gap-3 max-md:items-center">
+            <span className="w-fit px-4 py-1.5 text-sm text-white rounded-full border-2 border-[#413239] bg-[#1f1f1f]">
+              Answer Analysis
+            </span>
+            <h1 className="text-4xl font-semibold capitalize text-[var(--nav-text)] max-sm:text-3xl">
+              <span className="text-[var(--theme-color)]">{interview.jobRole}</span> Interview
+            </h1>
+            {isInProgress ? (
+              <p className="flex items-center gap-2 text-sm text-amber-400">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                This interview is still in progress. Analysis is only available for answered questions.
               </p>
+            ) : (
+              <p className="text-[var(--nav-text)]">Review each answer with detailed AI feedback</p>
             )}
           </div>
 
-          {/* buttons */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-center gap-3">
             {interview.status === "completed" && (
               <Link
                 href={`/interview/${interviewId}/results`}
-                className="text-gray-800 bg-gray-200 hover:bg-gray-300 py-1 px-3 rounded text-sm"
+                className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white transition-all duration-300 border-2 rounded-full border-[#413239] hover:border-[var(--theme-color)] hover:bg-[#1f1f1f]"
               >
+                <ArrowLeft className="w-4 h-4" />
                 Back to Results
               </Link>
             )}
-
-            {interview.status === "in-progress" && (
-              <MainButton
-                text="Continue Interview"
-                color="blue"
-                onClick={() => router.push(`/interview/${interviewId}`)}
-              />
+            {isInProgress && (
+              <button
+                onClick={continueInterview}
+                className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white transition-all duration-500 rounded-full cursor-pointer btn"
+              >
+                <PlayCircle className="w-4 h-4" />
+                Continue Interview
+              </button>
             )}
-
-            <MainButton
-              text="Dashboard"
-              color="gray"
-              onClick={() => router.push("/dashboard")}
-            />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* question list sidebar */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
+          {/* question list: chips on mobile, sidebar on desktop */}
           <QuestionList
             activeQuestionIndex={activeQuestionIndex}
             interview={interview}
-            onClick={(index) => setActiveQuestionIndex(index)}
+            onClick={goToQuestion}
           />
 
           {/* question analysis */}
-          <div className="md:col-span-3 space-y-6">
-            {/* questions and answer */}
+          <div ref={contentRef} className="space-y-6 md:col-span-3 scroll-mt-6">
             <QuizAndAnswer
-              onClick={() => router.push(`/interview/${interviewId}`)}
+              onClick={continueInterview}
               interview={interview}
-              scoreLabel={getScoreLabel}
               activeQuestion={activeQuestion}
               activeQuestionIndex={activeQuestionIndex}
             />
 
-            {/* analysis */}
             {activeQuestion.answer ? (
               activeQuestion.analysis ? (
-                <AnswerAnalysis
-                  scoreColor={getScoreColor}
-                  activeQuestion={activeQuestion}
-                  scoreBackground={getScoreBackground}
-                />
+                <AnswerAnalysis activeQuestion={activeQuestion} />
               ) : (
-                <div className="bg-gray-800 rounded-lg shadow-md p-6 text-center">
-                  <p className="text-gray-500 mb-2">
-                    Analysis is being generated for this question.
-                  </p>
-                  {interview.status === "in-progress" && (
-                    <p className="text-sm text-gray-400">
-                      Complete the interview to see full analysis.
-                    </p>
+                <div className="p-8 text-center bg border border-[#352a31] rounded-2xl">
+                  <Hourglass className="w-6 h-6 mx-auto mb-3 text-[var(--theme-hover)]" />
+                  <p className="mb-1 text-gray-300">Analysis is being generated for this question.</p>
+                  {isInProgress && (
+                    <p className="text-sm text-[var(--nav-text)]">Complete the interview to see full analysis.</p>
                   )}
                 </div>
               )
             ) : (
-              <div className="bg-[var(--input-bg)] rounded-lg shadow-md p-6 text-center">
-                <p className="text-gray-500 mb-2">
-                  Answer this question to see analysis.
-                </p>
-                {interview.status === "in-progress" && (
-                  <MainButton
-                    text="Continue Interview"
-                    color="blue"
-                    onClick={() => router.push(`/interview/${interviewId}`)}
-                  />
+              <div className="p-8 text-center bg border border-[#352a31] rounded-2xl">
+                <p className="mb-4 text-gray-300">Answer this question to see analysis.</p>
+                {isInProgress && (
+                  <button
+                    onClick={continueInterview}
+                    className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white transition-all duration-500 rounded-full cursor-pointer btn"
+                  >
+                    <PlayCircle className="w-4 h-4" />
+                    Continue Interview
+                  </button>
                 )}
               </div>
             )}
 
-            {/* navigation buttons */}
-            <div className="flex justify-between">
+            {/* previous / next */}
+            <div className="flex items-center justify-between gap-4">
               <PreviousNextBtn
-                position="mr-1"
-                path="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                direction="previous"
                 text="Previous Question"
                 disabled={activeQuestionIndex === 0}
-                onClick={() =>
-                  setActiveQuestionIndex((prev) => Math.max(0, prev - 1))
-                }
+                onClick={() => goToQuestion(Math.max(0, activeQuestionIndex - 1))}
               />
+              <span className="text-sm text-[var(--nav-text)]">
+                {activeQuestionIndex + 1} / {interview.questions.length}
+              </span>
               <PreviousNextBtn
-                position="ml-1"
-                path="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                direction="next"
                 text="Next Question"
-                disabled={
-                  activeQuestionIndex === interview.questions.length - 1
-                }
-                onClick={() =>
-                  setActiveQuestionIndex((prev) =>
-                    Math.min(interview.questions.length - 1, prev + 1)
-                  )
-                }
+                disabled={activeQuestionIndex === interview.questions.length - 1}
+                onClick={() => goToQuestion(Math.min(interview.questions.length - 1, activeQuestionIndex + 1))}
               />
             </div>
           </div>

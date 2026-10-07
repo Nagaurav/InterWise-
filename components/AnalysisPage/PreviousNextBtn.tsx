@@ -1,51 +1,24 @@
 import React from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface PreviousNextBtnProps {
   onClick: () => void;
   disabled: boolean;
   text: string;
-  path: string;
-  position: string;
+  direction: "previous" | "next";
 }
 
-const PreviousNextBtn = ({
-  onClick,
-  text,
-  disabled,
-  path,
-  position,
-}: PreviousNextBtnProps) => {
+const PreviousNextBtn = ({ onClick, text, disabled, direction }: PreviousNextBtnProps) => {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`px-4 py-2 rounded-md flex items-center ${
-        disabled
-          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-          : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-      }`}
+      className="flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium text-white transition-all duration-300 border-2 rounded-full cursor-pointer border-[#413239] hover:border-[var(--theme-color)] hover:bg-[#1f1f1f] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-[#413239] disabled:hover:bg-transparent max-sm:px-4"
     >
-      {position === "mr-1" && (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-5 w-5 mr-1"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path fillRule="evenodd" d={path} clipRule="evenodd" />
-        </svg>
-      )}
-      {text}
-      {position === "ml-1" && (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className={`h-5 w-5 ${position}`}
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path fillRule="evenodd" d={path} clipRule="evenodd" />
-        </svg>
-      )}
+      {direction === "previous" && <ChevronLeft className="w-4 h-4" />}
+      <span className="max-sm:hidden">{text}</span>
+      <span className="sm:hidden">{direction === "previous" ? "Prev" : "Next"}</span>
+      {direction === "next" && <ChevronRight className="w-4 h-4" />}
     </button>
   );
 };

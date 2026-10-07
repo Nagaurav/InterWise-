@@ -28,21 +28,21 @@ const InterviwFormInputs = ({
 }: InputProps) => {
   // Helper components for label styling
   const RequiredLabel = () => (
-    <span className="text-red-500 ml-1 text-xs">*</span>
+    <span className="ml-1 text-xs text-[var(--theme-hover)]">*</span>
   );
-  
+
   const OptionalLabel = () => (
-    <span className="text-gray-400 ml-1 text-xs">(Optional)</span>
+    <span className="ml-1 text-xs text-zinc-500">(Optional)</span>
   );
 
   return (
-    <div className="flex flex-col w-[100%]">
-      <label className="mb-2 text-sm flex items-center">
+    <div className="flex flex-col w-full">
+      <label className="flex items-center mb-2 text-sm font-medium text-gray-200">
         {label}
         {isOptional ? <OptionalLabel /> : (required ? <RequiredLabel /> : null)}
       </label>
       <input
-        className="border py-2 rounded-lg px-4 border-zinc-700 w-[100%]"
+        className="w-full h-12 px-4 text-white transition-colors border rounded-lg outline-none bg-[var(--input-bg)] border-[#352a31] placeholder-zinc-500 focus:border-[var(--theme-color)]"
         type={type}
         required={required && !isOptional}
         placeholder={placeholder}

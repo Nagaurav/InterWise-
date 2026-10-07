@@ -19,12 +19,13 @@ export default function InterviewPage({ params }: InterviewPageProps) {
   const { id: interviewId } = use(params);
 
   const router = useRouter();
-  const { getToken, isAuthenticated } = useAuth();
+  const { getToken, isAuthenticated, authLoading } = useAuth();
   const [interview, setInterview] = useState<Interview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
     const fetchInterview = async () => {
       try {
         // Check if user is authenticated first
@@ -70,7 +71,7 @@ export default function InterviewPage({ params }: InterviewPageProps) {
     };
 
     fetchInterview();
-  }, [interviewId, router, getToken, isAuthenticated]);
+  }, [interviewId, router, getToken, isAuthenticated, authLoading]);
 
   // function to update the interview data when an answer is submitted
   const handleInterviewUpdate = (updatedInterview: Interview) => {

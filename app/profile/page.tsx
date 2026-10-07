@@ -11,13 +11,14 @@ interface InterviewStats {
 }
 
 const ProfilePage = () => {
-  const { userData, isAuthenticated, getToken } = useAuth();
+  const { userData, isAuthenticated, authLoading, getToken } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<InterviewStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push("/login");
       return;
@@ -47,7 +48,7 @@ const ProfilePage = () => {
     };
 
     fetchStats();
-  }, [isAuthenticated, router, getToken]);
+  }, [isAuthenticated, router, getToken, authLoading]);
 
   if (!isAuthenticated || !userData) {
     return null;

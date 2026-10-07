@@ -1,74 +1,54 @@
 import React from "react";
+import { CheckCircle2, TrendingUp, MessageSquareText } from "lucide-react";
 
-interface OverviewTabDataProps {
-  interview: any;
-  scoreLabel: any;
-  scoreColor: any;
-}
+const OverviewTabData = ({ interview }: { interview: any }) => {
+  if (!interview.feedback) return null;
 
-const OverviewTabData = ({
-  interview,
-  scoreColor,
-  scoreLabel,
-}: OverviewTabDataProps) => {
   return (
-    <div className="bg-gradient-to-r from-[#b87a9c]/20 to-[#d8a1bc]/10 rounded-xl backdrop-blur-sm border border-[#b87a9c]/30 shadow-lg overflow-hidden p-6 mb-6">
-      <h2 className="text-xl font-bold mb-4">Overall Performance</h2>
-
-      <div className="flex flex-col items-center justify-center mb-6">
-        <div
-          className={`text-2xl mt-4 font-bold ${scoreColor(
-            interview.overallScore
-          )}`}
-        >
-          {scoreLabel(interview.overallScore)}
-        </div>
+    <div className="flex flex-col gap-5">
+      <div className="p-8 bg border border-[#352a31] rounded-2xl max-sm:p-6">
+        <h2 className="flex items-center gap-3 mb-4 text-xl font-bold">
+          <MessageSquareText className="w-5 h-5 text-[var(--theme-hover)]" />
+          Overall Feedback
+        </h2>
+        <p className="leading-relaxed text-gray-300">{interview.feedback.overallFeedback}</p>
       </div>
 
-      {interview.feedback && (
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold">Overall Feedback</h3>
-            <p className="text-gray-300 mt-2">
-              {interview.feedback.overallFeedback}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-            {/* strengths */}
-            <div className="bg-green-900/20 rounded-lg p-4">
-              <h3 className="font-semibold text-lg text-green-400 mb-2">
-                Strengths
-              </h3>
-              <ul className="list-disc pl-5 space-y-1">
-                {interview.feedback.strengths.map(
-                  (strength: string, index: number) => (
-                    <li className="text-gray-300" key={index}>
-                      {strength}
-                    </li>
-                  )
-                )}
-              </ul>
-            </div>
-
-            {/* areas of improvemnt */}
-            <div className="bg-red-900/20 rounded-lg p-4">
-              <h3 className="font-semibold text-lg text-red-400 mb-2">
-                Areas for Improvement
-              </h3>
-              <ul className="list-disc pl-5 space-y-1">
-                {interview.feedback.areasForImprovement.map(
-                  (strength: string, index: number) => (
-                    <li className="text-gray-300" key={index}>
-                      {strength}
-                    </li>
-                  )
-                )}
-              </ul>
-            </div>
-          </div>
+      <div className="grid gap-5 md:grid-cols-2">
+        <div className="p-8 bg border border-[#352a31] rounded-2xl max-sm:p-6">
+          <h3 className="flex items-center gap-3 mb-5 text-lg font-bold">
+            <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-emerald-900/20 border border-emerald-700/30">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            </span>
+            Strengths
+          </h3>
+          <ul className="space-y-3">
+            {interview.feedback.strengths.map((strength: string, index: number) => (
+              <li key={index} className="flex gap-3 text-gray-300">
+                <CheckCircle2 className="w-4 h-4 mt-1 shrink-0 text-emerald-400" />
+                {strength}
+              </li>
+            ))}
+          </ul>
         </div>
-      )}
+
+        <div className="p-8 bg border border-[#352a31] rounded-2xl max-sm:p-6">
+          <h3 className="flex items-center gap-3 mb-5 text-lg font-bold">
+            <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-amber-900/20 border border-amber-700/30">
+              <TrendingUp className="w-5 h-5 text-amber-400" />
+            </span>
+            Areas for Improvement
+          </h3>
+          <ul className="space-y-3">
+            {interview.feedback.areasForImprovement.map((area: string, index: number) => (
+              <li key={index} className="flex gap-3 text-gray-300">
+                <TrendingUp className="w-4 h-4 mt-1 shrink-0 text-amber-400" />
+                {area}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 };

@@ -22,14 +22,16 @@ export default function ResultsPage({ params }: ResultsPageProps) {
   const { id: interviewId } = use(params);
 
   const router = useRouter();
-  const { getToken, isAuthenticated } = useAuth();
+  const { getToken, isAuthenticated, authLoading } = useAuth();
   const [interview, setInterview] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [shareCopied, setShareCopied] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (authLoading) return;
     const fetchInterview = async () => {
       try {
         setLoading(true);
@@ -86,62 +88,46 @@ export default function ResultsPage({ params }: ResultsPageProps) {
     };
 
     fetchInterview();
-  }, [interviewId, router, isAuthenticated, getToken]);
-
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-500";
-    if (score >= 60) return "text-yellow-500";
-    return "text-red-500";
-  };
-
-  const getScoreLabel = (score: number) => {
-    if (score >= 90) return "Excellent";
-    if (score >= 80) return "Very Good";
-    if (score >= 70) return "Good";
-    if (score >= 60) return "Satisfactory";
-    if (score >= 50) return "Needs Improvement";
-    return "Poor";
-  };
+  }, [interviewId, router, isAuthenticated, getToken, authLoading]);
 
   const handlePrint = () => {
     const printContents = resultsRef.current?.innerHTML;
-    const originalContents = document.body.innerHTML;
+    if (!printContents) return;
 
-    if (printContents) {
-      document.body.innerHTML = `
-        <html>
-          <head>
-            <title>Interview Results - ${interview.jobRole}</title>
-            <style>
-              body { font-family: Arial, sans-serif; color: #333; }
-              h1, h2, h3 { margin-top: 20px; }
-              .score { font-size: 24px; font-weight: bold; }
-              .section { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
-              .question { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
-              ul { padding-left: 20px; }
-            </style>
-          </head>
-          <body>
-            <h1>Interview Results - ${interview.jobRole}</h1>
-            ${printContents}
-          </body>
-        </html>
-        `;
-
-      window.print();
-      document.body.innerHTML = originalContents;
-    }
+    // Print from a separate window: overwriting document.body here would break the React app
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Interview Results - ${interview.jobRole}</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #222; padding: 24px; }
+            h1, h2, h3 { margin-top: 20px; }
+            svg { width: 16px; height: 16px; vertical-align: middle; }
+            ul, ol { padding-left: 20px; }
+            li { margin-bottom: 6px; }
+          </style>
+        </head>
+        <body>
+          <h1>Interview Results - ${interview.jobRole}</h1>
+          ${printContents}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
   };
 
   const handleShare = () => {
-    // create a sharable link
-    const shareUrl = window.location.href;
-
-    // copy to clipboard
+    // copy a shareable link to the clipboard
     navigator.clipboard
-      .writeText(shareUrl)
+      .writeText(window.location.href)
       .then(() => {
-        alert("Link copied to clipboard");
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2000);
       })
       .catch((err) => {
         console.error("Failed to copy link: ", err);
@@ -163,17 +149,24 @@ export default function ResultsPage({ params }: ResultsPageProps) {
   return (
     <>
       <InterviewNav interview={interview} />
-      <div className="text-white container mx-auto py-6 px-1 max-w-[90%]">
-        {/* // results nav */}
+      <div className="px-10 pt-10 pb-16 mx-auto text-white max-w-7xl max-sm:px-6">
         <ResultsNav
           interviewId={interviewId}
+          jobRole={interview.jobRole}
+          date={new Date(interview.completedAt || interview.createdAt).toLocaleDateString(undefined, {
+            day: "numeric", month: "long", year: "numeric",
+          })}
           handlePrint={handlePrint}
           handleShare={handleShare}
+          shareCopied={shareCopied}
         />
 
-        {/* tabs */}
-        <div className="mb-6 border-b border-zinc-600">
-          <nav className="flex mb-4">
+        <div ref={resultsRef}>
+          {/* score + interview details */}
+          <InterviewDetails interview={interview} />
+
+          {/* tabs */}
+          <div className="flex w-fit p-1 mb-6 rounded-full bg-[#1f1f1f] border border-[#352a31] max-sm:mx-auto">
             <ResultTabBtn
               tabText="overview"
               onClick={() => setActiveTab("overview")}
@@ -186,26 +179,10 @@ export default function ResultsPage({ params }: ResultsPageProps) {
               activeTab={activeTab}
               text="Detailed Feedback"
             />
-          </nav>
-        </div>
+          </div>
 
-        <div ref={resultsRef}>
-          {/* interview details */}
-          <InterviewDetails interview={interview} />
-
-          {/* overview tab */}
-          {activeTab === "overview" && (
-            <OverviewTabData
-              interview={interview}
-              scoreLabel={getScoreLabel}
-              scoreColor={getScoreColor}
-            />
-          )}
-
-          {/* Feedback tab */}
-          {activeTab === "feedback" && (
-            <FeedbackTabData interview={interview} />
-          )}
+          {activeTab === "overview" && <OverviewTabData interview={interview} />}
+          {activeTab === "feedback" && <FeedbackTabData interview={interview} />}
         </div>
       </div>
     </>

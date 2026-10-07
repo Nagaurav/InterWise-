@@ -13,9 +13,8 @@ html {
   text-rendering: optimizeLegibility;
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-  will-change: transform;
+  /* No global transform/will-change here: a transform on every element breaks
+     position: fixed (fixed elements then scroll with the page and add extra scroll height). */
 }
 
 :root {

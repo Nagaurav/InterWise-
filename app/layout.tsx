@@ -58,7 +58,7 @@ export default function RootLayout({
       </head>
       <body className={`${mazzard.variable} ${radis.variable} font-sans antialiased`}>
         <AuthProvider>
-          <div className="fixed left-0 -top-30 -z-10 w-auto h-auto">
+          <div className="fixed left-0 -top-30 -z-10 w-auto h-auto pointer-events-none">
             <Image 
               width={700} 
               height={700} 
@@ -68,7 +68,7 @@ export default function RootLayout({
               priority 
             />
           </div>
-          <div className="fixed right-0 bottom-0 -z-10 w-auto h-auto">
+          <div className="fixed right-0 bottom-0 -z-10 w-auto h-auto pointer-events-none">
             <Image
               className="bottom-0 right-0 -z-10"
               width={700}

@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -10,6 +10,8 @@ interface User {
 
 interface AuthContextType<T = User> {
   isAuthenticated: boolean;
+  // true until the auth cookies have been read on the client
+  authLoading: boolean;
   userData: T | null;
   login: (token: string, userData: T) => void;
   logout: () => void;
@@ -21,6 +23,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userData, setUserData] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -55,9 +58,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       console.log('[AuthContext] No valid auth state found');
     }
+    setAuthLoading(false);
   }, []);
 
-  const getToken = async (): Promise<string | null> => {
+  const getToken = useCallback(async (): Promise<string | null> => {
     const allCookies = document.cookie;
     console.log('[AuthContext] All cookies:', allCookies);
     
@@ -68,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     console.log('[AuthContext] Token retrieved:', token ? 'Present' : 'Missing');
     return token;
-  };
+  }, []);
 
   const login = (token: string, userData: User) => {
     console.log('[AuthContext] Login function called with:', { token: token.substring(0, 20) + '...', userData });
@@ -125,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, userData, login, logout, getToken }}>
+    <AuthContext.Provider value={{ isAuthenticated, authLoading, userData, login, logout, getToken }}>
       {children}
     </AuthContext.Provider>
   );

@@ -151,25 +151,39 @@ export async function POST(req: Request) {
     console.log("Initial resume text length:", resumeText.length);
     console.log("Resume text preview:", resumeText ? resumeText.substring(0, 100) + "..." : "(empty)");
     
-    // If a file is uploaded, extract text from it (this will override any pasted text)
+    // If a file is uploaded, validate it's a PDF and extract text from it
     if (resumeFile && resumeFile.size > 0) {
       console.log(`Processing uploaded document: ${resumeFile.name}, Size: ${resumeFile.size} bytes, Type: ${resumeFile.type}`);
+      
+      // Validate file type
+      const fileType = resumeFile.type.toLowerCase();
+      const fileName = resumeFile.name.toLowerCase();
+      const isPDF = fileType === 'application/pdf' || fileName.endsWith('.pdf');
+      
+      if (!isPDF) {
+        console.warn(`Rejected non-PDF file: ${resumeFile.name} (${fileType})`);
+        return NextResponse.json(
+          { message: `Unsupported file type: ${fileType || 'unknown'}. Please upload a PDF document.` },
+          { status: 400 }
+        );
+      }
+      
       try {
         const extractedText = await extractTextFromDocument(resumeFile);
         console.log(`Document extraction result: ${extractedText ? extractedText.length : 0} characters extracted`);
         
         if (extractedText && extractedText.trim().length > 0) {
           resumeText = extractedText;
-          console.log("Successfully updated resumeText with extracted document content");
+          console.log("Successfully updated resumeText with extracted PDF content");
         } else {
-          console.warn("Document extraction returned empty or invalid text");
-          // Set a fallback message to indicate document was processed
-          resumeText = `Document file processed: ${resumeFile.name} - Please ensure job role and tech stack are filled manually`;
+          console.warn("PDF extraction returned empty or invalid text");
+          // Set a fallback message to indicate document was processed but no text was extracted
+          resumeText = `PDF file processed but no text could be extracted from: ${resumeFile.name} - Please ensure job role and tech stack are filled manually`;
         }
       } catch (error) {
-        console.error("Error processing resume file: ", error);
+        console.error("Error processing PDF file: ", error);
         // Set a fallback message and continue
-        resumeText = `Document upload detected: ${resumeFile.name} - Processing failed, please fill fields manually`;
+        resumeText = `Error processing PDF file (${resumeFile.name}): ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure job role and tech stack are filled manually.`;
       }
     } else if (resumeFile) {
       console.log("Resume file provided but has 0 size");

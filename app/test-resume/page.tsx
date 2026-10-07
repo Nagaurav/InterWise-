@@ -54,10 +54,10 @@ export default function TestResumePage() {
       
       {/* PDF Test Section */}
       <div className="mb-8 p-6 border rounded-lg">
-        <h2 className="text-xl font-semibold mb-4">1. Test Document Parsing (PDF & Word)</h2>
+        <h2 className="text-xl font-semibold mb-4">1. Test Document Parsing (PDF Only)</h2>
         <input
           type="file"
-          accept=".pdf,.docx"
+          accept=".pdf"
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) testPDF(file);
@@ -111,7 +111,7 @@ export default function TestResumePage() {
       <div className="p-6 bg-yellow-50 rounded-lg">
         <h3 className="font-semibold mb-2">How to use this test:</h3>
         <ol className="list-decimal list-inside space-y-1 text-sm">
-          <li>Upload a PDF resume to test if text extraction works</li>
+          <li>Upload a PDF resume (only .pdf files are supported)</li>
           <li>Check the console logs in your browser and server for detailed debugging info</li>
           <li>If PDF extraction works, click "Test Gemini with Extracted PDF Text" to test question generation</li>
           <li>Compare the generated questions to see if they're personalized to the resume content</li>

@@ -14,10 +14,10 @@ const ResultTabBtn = ({
   return (
     <button
       onClick={onClick}
-      className={`py-2 cursor-pointer px-4 text-sm font-medium ${
+      className={`px-5 py-2 text-sm font-semibold rounded-full cursor-pointer transition-colors duration-300 ${
         activeTab === tabText
-          ? "bg-[var(--theme-color)] transition-all duration-300 rounded-full"
-          : "text-gray-500 hover:text-gray-700 hover:border-gray-300"
+          ? "bg-[var(--theme-color)] text-white"
+          : "text-zinc-400 hover:text-white"
       }`}
     >
       {text}

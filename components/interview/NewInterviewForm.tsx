@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { FileText, Upload, X } from "lucide-react";
 import FormFeature from "../small-components/FormFeature";
 import InterviwFormInputs from "../small-components/InterviwFormInputs";
 import { useAuth } from "@/context/AuthContext";
@@ -50,18 +51,10 @@ const NewInterviewForm = ({ onClose, onStartInterview }: NewInterviewFormProps) 
     if (inputMode === "upload" && resumeFile) {
       if (resumeFile.size > MAX_FILE_SIZE) return "File size must be under 5MB";
       
-      const allowedTypes = [
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      ];
-      const allowedExtensions = [".pdf", ".docx"];
-      const fileName = resumeFile.name.toLowerCase();
-      
-      const isValidType = allowedTypes.includes(resumeFile.type) || 
-                         allowedExtensions.some(ext => fileName.endsWith(ext));
-      
-      if (!isValidType) {
-        return "Only PDF (.pdf) and Word (.docx) files are allowed";
+      // The API only extracts text from PDFs
+      const isPDF = resumeFile.type === "application/pdf" || resumeFile.name.toLowerCase().endsWith(".pdf");
+      if (!isPDF) {
+        return "Only PDF (.pdf) files are allowed";
       }
     }
 
@@ -156,15 +149,20 @@ const NewInterviewForm = ({ onClose, onStartInterview }: NewInterviewFormProps) 
   const formIsOptional = !!(resumeFile || form.resumeText.trim());
 
   return (
-    <section className="flex w-full h-screen">
-      <form onSubmit={handleSubmit} className="w-1/2 max-sm:w-full flex flex-col items-center justify-center">
-        
-        <div className="text-center mt-10">
-          <h1 className="text-4xl font-semibold">Welcome Buddy!</h1>
-          <p>Create your interview to start your journey!</p>
+    <section className="grid items-start w-full gap-12 px-10 pb-16 mx-auto max-w-7xl lg:grid-cols-2 max-sm:px-6">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-xl mx-auto bg border border-[#352a31] rounded-2xl p-8 max-sm:p-6"
+      >
+        <div className="flex flex-col items-center gap-3 mb-8 text-center">
+          <span className="px-4 py-1.5 text-sm text-white rounded-full border-2 border-[#413239] bg-[#1f1f1f]">
+            New Interview
+          </span>
+          <h1 className="text-4xl font-semibold text-white max-sm:text-3xl">Create Your Interview</h1>
+          <p className="text-[var(--nav-text)]">Tell us about the role, or upload your resume and we&apos;ll do the rest.</p>
         </div>
 
-        <div className="flex flex-col gap-4 w-[55%] max-sm:w-full max-sm:px-8 p-4 mt-6">
+        <div className="flex flex-col gap-5">
 
           {/* Inputs */}
           {[
@@ -191,7 +189,7 @@ const NewInterviewForm = ({ onClose, onStartInterview }: NewInterviewFormProps) 
                 isOptional={formIsOptional}
                 onChange={(e) => updateForm(key, e.target.value)}
               />
-              <p className="text-xs text-zinc-500 mt-1">
+              <p className="mt-1.5 text-xs text-zinc-500">
                 {formIsOptional ? "Optional — will be extracted from resume if not provided" : "Required if no resume provided"}
               </p>
             </div>
@@ -209,44 +207,70 @@ const NewInterviewForm = ({ onClose, onStartInterview }: NewInterviewFormProps) 
               required={false}
               isOptional={true}
             />
-            <p className="text-xs text-zinc-500 mt-1">
+            <p className="mt-1.5 text-xs text-zinc-500">
               Always optional — will be extracted from resume if not provided
             </p>
           </div>
 
-          {/* Resume Mode Toggle */}
+          {/* Resume */}
           <div>
-            <div className="flex mb-2">
-              {["upload", "paste"].map(mode => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setInputMode(mode as any)}
-                  className={`px-4 py-2 text-sm font-medium ${inputMode === mode ? "bg-blue-600 text-white" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"} ${mode === "upload" ? "rounded-l-lg" : "rounded-r-lg"}`}
-                >
-                  {mode === "upload" ? "Upload Resume" : "Paste Content"}
-                </button>
-              ))}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-200">Resume</span>
+              <div className="flex p-1 rounded-full bg-[#1f1f1f] border border-[#352a31]">
+                {["upload", "paste"].map(mode => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setInputMode(mode as any)}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-full cursor-pointer transition-colors ${inputMode === mode ? "bg-[var(--theme-color)] text-white" : "text-zinc-400 hover:text-white"}`}
+                  >
+                    {mode === "upload" ? "Upload PDF" : "Paste Text"}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Conditional Resume Input */}
             {inputMode === "upload" ? (
-              <input
-                className="border py-2 rounded-lg px-4 border-zinc-700 w-full"
-                type="file"
-                accept=".pdf,.docx"
-                onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
-              />
+              resumeFile ? (
+                <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-[var(--input-bg)] border border-[var(--theme-color)]/60">
+                  <FileText className="flex-shrink-0 w-5 h-5 text-[var(--theme-hover)]" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{resumeFile.name}</p>
+                    <p className="text-xs text-zinc-500">{(resumeFile.size / 1024).toFixed(0)} KB</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setResumeFile(null)}
+                    aria-label="Remove file"
+                    className="p-1.5 rounded-full cursor-pointer text-zinc-400 hover:text-white hover:bg-[#352a31]"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center gap-2 px-4 py-8 text-center transition-colors border-2 border-dashed rounded-lg cursor-pointer bg-[var(--input-bg)] border-[#352a31] hover:border-[var(--theme-color)]">
+                  <Upload className="w-6 h-6 text-[var(--theme-hover)]" />
+                  <span className="text-sm font-medium text-white">Click to upload your resume</span>
+                  <span className="text-xs text-zinc-500">PDF only, up to 5MB</span>
+                  <input
+                    className="hidden"
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+              )
             ) : (
               <textarea
-                className="w-full h-40 p-3 text-sm border rounded-lg border-zinc-700 bg-zinc-800 text-white"
+                className="w-full h-40 p-4 text-sm text-white transition-colors border rounded-lg outline-none resize-none bg-[var(--input-bg)] border-[#352a31] placeholder-zinc-500 focus:border-[var(--theme-color)]"
                 placeholder="Paste resume or type experience..."
                 value={form.resumeText}
                 onChange={(e) => updateForm("resumeText", e.target.value)}
               />
             )}
 
-            {status.fileError && <p className="text-red-500 text-sm mt-1">{status.fileError}</p>}
+            {status.fileError && <p className="mt-1 text-sm text-red-400">{status.fileError}</p>}
           </div>
 
           {/* Warnings / Errors */}
@@ -254,11 +278,11 @@ const NewInterviewForm = ({ onClose, onStartInterview }: NewInterviewFormProps) 
           {status.error && <Alert text={status.error} type="error" />}
 
           {/* Buttons */}
-          <div className="flex gap-2 mt-4">
+          <div className="flex gap-3 mt-2 max-sm:flex-col">
             <button
               type="submit"
               disabled={status.isSubmitting}
-              className="w-full bg-[#984CFF] text-white py-2 rounded-md hover:bg-[#974cffba]"
+              className="w-full py-3 font-semibold text-white transition-all duration-500 rounded-full cursor-pointer btn disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {status.isSubmitting ? "Creating..." : "Start Interview"}
             </button>
@@ -266,7 +290,7 @@ const NewInterviewForm = ({ onClose, onStartInterview }: NewInterviewFormProps) 
             <button
               type="button"
               onClick={onClose}
-              className="w-full border border-gray-300 py-2 rounded-md bg-white hover:bg-gray-50 dark:bg-gray-700 text-white"
+              className="w-full py-3 font-medium text-white transition-all duration-300 border-2 rounded-full cursor-pointer border-[#413239] hover:border-[var(--theme-color)] hover:bg-[#1f1f1f]"
             >
               Cancel
             </button>
@@ -274,13 +298,15 @@ const NewInterviewForm = ({ onClose, onStartInterview }: NewInterviewFormProps) 
         </div>
       </form>
 
-      <FormFeature />
+      <div className="lg:pt-10">
+        <FormFeature />
+      </div>
     </section>
   );
 };
 
 const Alert = ({ text, type }: { text: string; type: "error" | "warning" }) => (
-  <div className={`p-4 border-l-4 rounded-md ${type === "error" ? "border-red-600 bg-red-900/30" : "border-yellow-600 bg-yellow-900/30"}`}>
+  <div className={`p-4 border-l-4 rounded-lg ${type === "error" ? "border-red-500 bg-red-900/20" : "border-yellow-500 bg-yellow-900/20"}`}>
     <p className={`text-sm ${type === "error" ? "text-red-200" : "text-yellow-200"}`}>{text}</p>
   </div>
 );

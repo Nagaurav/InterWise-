@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
 const SettingsPage = () => {
-  const { userData, isAuthenticated, logout } = useAuth();
+  const { userData, isAuthenticated, authLoading, logout } = useAuth();
   const router = useRouter();
   const [formData, setFormData] = useState({
     name: "",
@@ -19,6 +19,7 @@ const SettingsPage = () => {
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push("/login");
       return;
@@ -34,7 +35,7 @@ const SettingsPage = () => {
       });
       setIsLoading(false);
     }
-  }, [isAuthenticated, router, userData]);
+  }, [isAuthenticated, router, userData, authLoading]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;

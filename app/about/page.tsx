@@ -1,138 +1,159 @@
 import React from 'react';
 import Link from 'next/link';
-import { Code, Users, Zap, BarChart2, MessageSquare, FileText, CheckCircle } from 'lucide-react';
+import { Bot, MessageSquareText, FileText, Upload, Mic, BarChart3, CheckCircle2 } from 'lucide-react';
+import Button from '@/components/Button';
+
+const features = [
+  {
+    icon: Bot,
+    title: 'AI-Powered Interviews',
+    description: 'Practice with an AI interviewer that asks questions tailored to your role and tech stack.',
+  },
+  {
+    icon: MessageSquareText,
+    title: 'Personalized Feedback',
+    description: 'Get detailed analysis of every answer, covering both technical depth and communication.',
+  },
+  {
+    icon: FileText,
+    title: 'Resume-Based Questions',
+    description: 'Upload your resume and the interview adapts to your actual experience and projects.',
+  },
+];
+
+const steps = [
+  {
+    icon: Upload,
+    title: 'Upload Your Resume',
+    description: 'Add your resume or fill in the job role and tech stack to customize the interview.',
+  },
+  {
+    icon: Mic,
+    title: 'Start the Interview',
+    description: 'Answer questions from the AI interviewer at your own pace, whenever suits you.',
+  },
+  {
+    icon: BarChart3,
+    title: 'Review Your Results',
+    description: 'See your scores, feedback on each answer, and learning resources to improve.',
+  },
+];
+
+const benefits = [
+  'Practice anytime, anywhere',
+  'No scheduling required',
+  'Unlimited interview attempts',
+  'Track your progress over time',
+  'Build confidence in your skills',
+  'Learn from targeted resources',
+];
+
+const SectionHeading = ({ badge, title, subtitle }: { badge: string; title: string; subtitle?: string }) => (
+  <div className="flex flex-col items-center gap-4 mb-12 text-center">
+    <span className="px-4 py-1.5 text-sm text-white rounded-full border-2 border-[#413239] bg-[#1f1f1f]">
+      {badge}
+    </span>
+    <h2 className="text-4xl font-semibold text-white max-sm:text-3xl">{title}</h2>
+    {subtitle && <p className="max-w-2xl text-lg text-[var(--nav-text)]">{subtitle}</p>}
+  </div>
+);
 
 const AboutPage = () => {
-  const features = [
-    {
-      icon: <Code className="w-8 h-8 text-blue-500" />,
-      title: 'AI-Powered Interviews',
-      description: 'Practice with our advanced AI that simulates real technical interviews.'
-    },
-    {
-      icon: <Users className="w-8 h-8 text-green-500" />,
-      title: 'Personalized Feedback',
-      description: 'Get detailed feedback on your answers to help you improve.'
-    },
-    {
-      icon: <Zap className="w-8 h-8 text-yellow-500" />,
-      title: 'Quick Setup',
-      description: 'Start practicing in minutes with just your resume or job description.'
-    }
-  ];
-
-  const steps = [
-    {
-      number: '1',
-      title: 'Upload or Paste Resume',
-      description: 'Provide your resume or job description to customize your interview.'
-    },
-    {
-      number: '2',
-      title: 'Start Interview',
-      description: 'Begin your practice session with our AI interviewer.'
-    },
-    {
-      number: '3',
-      title: 'Get Feedback',
-      description: 'Receive detailed feedback on your performance.'
-    }
-  ];
-
-  const benefits = [
-    'Practice anytime, anywhere',
-    'No scheduling required',
-    'Unlimited interview attempts',
-    'Track your progress over time',
-    'Build confidence in your skills'
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-zinc-800 text-white">
-      {/* Hero Section */}
-      <section className="py-20 px-4 max-w-6xl mx-auto text-center">
-        <h1 className="text-5xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
-          Revolutionizing Technical Interviews
+    <div className="text-white">
+      {/* Hero */}
+      <section className="flex flex-col items-center gap-6 px-8 pt-16 pb-24 text-center max-sm:pt-8">
+        <span className="w-56 py-2 rounded-full border-2 border-[#413239] bg-[#1f1f1f]">
+          About Interwise
+        </span>
+        <h1 className="max-w-4xl text-6xl font-semibold leading-tight text-[var(--nav-text)] max-sm:text-[40px]">
+          Your AI Partner for{' '}
+          <span className="text-[var(--theme-color)]">Interview Success</span>
         </h1>
-        <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
-          Practice technical interviews with our AI-powered platform and get the confidence you need to ace your next interview.
+        <p className="max-w-2xl text-xl text-[var(--nav-text)] max-sm:text-lg">
+          Interwise helps you practice technical interviews with AI, so you walk into the real one prepared and
+          confident.
         </p>
-        <div className="flex justify-center gap-4">
-          <Link href="/interview/new" className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors">
-            Start Practicing
-          </Link>
-          <Link href="/dashboard" className="bg-transparent hover:bg-zinc-700 text-white font-medium py-3 px-6 rounded-lg border border-zinc-600 transition-colors">
+        <div className="flex flex-wrap items-center justify-center gap-4 mt-4">
+          <Button href="/interview/new" name="Start Practicing" style={{ fontWeight: 600 }} />
+          <Link
+            href="/dashboard"
+            className="px-8 py-3 font-medium text-white transition-all duration-300 border-2 rounded-full max-sm:px-6 sm:text-xl border-[#413239] hover:border-[var(--theme-color)] hover:bg-[#1f1f1f]"
+          >
             View Dashboard
           </Link>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-16 bg-zinc-800/50">
-        <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">Why Choose Our Platform?</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <div key={index} className="bg-zinc-800 p-6 rounded-xl hover:bg-zinc-700/50 transition-colors">
-                <div className="w-12 h-12 bg-zinc-700 rounded-lg flex items-center justify-center mb-4">
-                  {feature.icon}
-                </div>
-                <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                <p className="text-gray-400">{feature.description}</p>
+      {/* Features */}
+      <section className="max-w-6xl px-8 pb-24 mx-auto">
+        <SectionHeading
+          badge="Features"
+          title="Why Choose Interwise?"
+          subtitle="Everything you need to prepare for your next technical interview, in one place."
+        />
+        <div className="grid gap-6 md:grid-cols-3">
+          {features.map(({ icon: Icon, title, description }) => (
+            <div
+              key={title}
+              className="bg border border-[#352a31] rounded-xl px-6 py-8 transition-colors duration-300 hover:border-[var(--theme-color)]"
+            >
+              <div className="flex items-center justify-center w-12 h-12 mb-5 rounded-lg bg-[#352a31]/60 border border-[#453841]/60">
+                <Icon className="w-6 h-6 text-[var(--theme-hover)]" />
               </div>
-            ))}
-          </div>
+              <h3 className="mb-2 text-xl font-bold">{title}</h3>
+              <p className="text-gray-400">{description}</p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-16">
-        <div className="max-w-4xl mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
-          <div className="space-y-8">
-            {steps.map((step, index) => (
-              <div key={index} className="flex items-start gap-6">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg">
-                  {step.number}
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
-                  <p className="text-gray-400">{step.description}</p>
-                </div>
+      {/* How it works */}
+      <section className="max-w-6xl px-8 pb-24 mx-auto">
+        <SectionHeading badge="How It Works" title="Three Steps to Get Started" />
+        <div className="grid gap-6 md:grid-cols-3">
+          {steps.map(({ icon: Icon, title, description }, index) => (
+            <div key={title} className="relative bg border border-[#352a31] rounded-xl px-6 py-8">
+              <span className="absolute text-5xl font-semibold top-5 right-6 text-[#352a31]">
+                0{index + 1}
+              </span>
+              <div className="flex items-center justify-center w-12 h-12 mb-5 rounded-full bg-[var(--theme-color)]">
+                <Icon className="w-5 h-5 text-white" />
               </div>
-            ))}
-          </div>
+              <h3 className="mb-2 text-xl font-bold">{title}</h3>
+              <p className="text-gray-400">{description}</p>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* Benefits */}
-      <section className="py-16 bg-zinc-800/50">
-        <div className="max-w-4xl mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">Benefits</h2>
-          <ul className="grid md:grid-cols-2 gap-4">
-            {benefits.map((benefit, index) => (
-              <li key={index} className="flex items-center gap-3">
-                <CheckCircle className="text-green-500" />
-                <span>{benefit}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+      <section className="max-w-4xl px-8 pb-24 mx-auto">
+        <SectionHeading badge="Benefits" title="Practice Without Limits" />
+        <ul className="grid gap-4 sm:grid-cols-2">
+          {benefits.map((benefit) => (
+            <li
+              key={benefit}
+              className="flex items-center gap-3 px-5 py-4 rounded-xl bg-[#1f1f1f]/70 border border-[#352a31]"
+            >
+              <CheckCircle2 className="flex-shrink-0 w-5 h-5 text-[var(--theme-hover)]" />
+              <span className="text-gray-200">{benefit}</span>
+            </li>
+          ))}
+        </ul>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 text-center">
-        <div className="max-w-2xl mx-auto px-4">
-          <h2 className="text-3xl font-bold mb-6">Ready to Ace Your Next Interview?</h2>
-          <p className="text-xl text-gray-300 mb-8">
-            Join thousands of developers who have improved their interview skills with our platform.
+      {/* CTA */}
+      <section className="max-w-4xl px-8 pb-24 mx-auto">
+        <div className="relative overflow-hidden text-center bg border border-[#352a31] rounded-2xl px-8 py-16 max-sm:py-10">
+          <div className="absolute w-72 h-72 rounded-full -top-36 left-1/2 -translate-x-1/2 bg-[var(--theme-color)]/20 blur-3xl pointer-events-none" />
+          <h2 className="relative mb-4 text-4xl font-semibold max-sm:text-3xl">Ready to Ace Your Next Interview?</h2>
+          <p className="relative max-w-xl mx-auto mb-8 text-lg text-[var(--nav-text)]">
+            Start a practice session now and get AI-powered feedback in minutes.
           </p>
-          <Link 
-            href="/interview/new" 
-            className="inline-block bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium py-3 px-8 rounded-lg transition-all transform hover:scale-105"
-          >
-            Start Your Free Interview Now
-          </Link>
+          <div className="relative">
+            <Button href="/interview/new" name="Start Your Interview" style={{ fontWeight: 600 }} />
+          </div>
         </div>
       </section>
     </div>
