@@ -3,7 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import Interview from "@/models/Interview";
 import { getUserIdFromToken } from "@/lib/auth";
 import { generateInterviewFeedback } from "@/lib/gemini";
-import { analyzeMissingAnswers, markUnansweredQuestions } from "@/lib/interviewScore";
+import { addIdealAnswersForUnanswered, analyzeMissingAnswers, markUnansweredQuestions } from "@/lib/interviewScore";
 
 export async function POST(
   req: Request,
@@ -49,8 +49,9 @@ export async function POST(
     if (skippedCount > 0) console.log(`${skippedCount} unanswered question(s) scored 0`);
 
     // Answers are analyzed in the background when saved; make sure none are still missing
-    // (e.g. the last answer, submitted just before this) so the score and feedback cover them all
-    await analyzeMissingAnswers(interviewId);
+    // (e.g. the last answer, submitted just before this) so the score and feedback cover them all.
+    // Meanwhile, skipped questions get a sample ideal answer for the analysis page.
+    await Promise.all([analyzeMissingAnswers(interviewId), addIdealAnswersForUnanswered(interviewId)]);
     interview = (await Interview.findById(interviewId))!;
 
     // Overall score: average over all questions (unanswered ones count as 0)

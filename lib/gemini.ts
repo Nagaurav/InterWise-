@@ -96,6 +96,7 @@ interface AnalysisResult {
   technicalFeedback: string;
   communicationFeedback: string;
   improvementSuggestions: string[];
+  idealAnswer?: string;
 }
 
 interface LearningResource {
@@ -214,8 +215,10 @@ export const analyzeResponse = async (
         "score": number,
         "technicalFeedback": string,
         "communicationFeedback": string,
-        "improvementSuggestions": string[]
-      }`;
+        "improvementSuggestions": string[],
+        "idealAnswer": string
+      }
+      idealAnswer: a strong sample answer to the question (4-6 sentences), written as the candidate would say it.`;
 
     // Use retry mechanism for API call
     const result = await generateWithFallback(prompt);
@@ -238,12 +241,39 @@ export const analyzeResponse = async (
     ) {
       throw new Error("Invalid analysis format from API");
     }
+    if (typeof parsed.idealAnswer !== "string" || !parsed.idealAnswer.trim()) delete parsed.idealAnswer;
 
     return parsed;
   } catch (error) {
     console.error("Error analyzing response:", error);
     throw new Error("Failed to analyze interview response");
   }
+};
+
+/**
+ * Writes a sample ideal answer for each question (used for questions the candidate skipped, so the
+ * analysis page can still show what a good answer looks like). Returns one string per question,
+ * "" where none could be generated.
+ */
+export const generateIdealAnswers = async (questions: string[]): Promise<string[]> => {
+  if (questions.length === 0) return [];
+  const prompt = `For each of these job interview questions, write a strong sample answer (4-6 sentences),
+      written as the candidate would say it.
+
+      Questions:
+      ${questions.map((q, i) => `${i + 1}. ${q}`).join("\n      ")}
+
+      Return valid JSON format, with exactly one answer per question, in the same order:
+      {
+        "answers": string[]
+      }`;
+
+  const result = await generateWithFallback(prompt);
+  const parsed = JSON.parse(
+    (await result.response.text()).replace(/```json/g, "").replace(/```/g, "").trim()
+  );
+  const answers: unknown[] = Array.isArray(parsed?.answers) ? parsed.answers : [];
+  return questions.map((_, i) => (typeof answers[i] === "string" ? (answers[i] as string).trim() : ""));
 };
 
 export const generateInterviewFeedback = async (

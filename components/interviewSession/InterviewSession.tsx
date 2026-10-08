@@ -113,6 +113,18 @@ export default function InterviewSession({
         recognitionRef.current.stop();
         recognitionRef.current = null;
       }
+      // Release the mic without sending the recording off for transcription
+      const recorder = mediaRecorderRef.current;
+      mediaRecorderRef.current = null;
+      if (recorder) {
+        recorder.onstop = null;
+        recorder.stream.getTracks().forEach((t) => t.stop());
+        try {
+          recorder.stop();
+        } catch {
+          // already stopped
+        }
+      }
       if (timeRef.current) {
         clearInterval(timeRef.current);
       }
@@ -162,9 +174,23 @@ export default function InterviewSession({
   const flushWaitersRef = useRef<Array<() => void>>([]);
   const pendingInterimRef = useRef(""); // words heard but not yet finalized by the browser
 
-  // Latest answer text, readable from async code (saving after the mic has delivered its last words)
+  // Accurate transcription: alongside the browser's live (but error-prone) recognition, the mic audio
+  // is recorded and, when the user stops, transcribed by Gemini. That text then replaces what the
+  // browser wrote for this recording. If it fails, the browser's text simply stays.
+  // heardSpeech: the browser recognized at least one word; liveThroughout: its recognition ran the whole time
+  type VoiceSegment = { base: string; questionIndex: number; typed: boolean; heardSpeech: boolean; liveThroughout: boolean };
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const segmentRef = useRef<VoiceSegment | null>(null); // the recording in progress or being transcribed
+  const finishRef = useRef<Promise<void> | null>(null); // resolves once the stopped recording is applied
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [hasLivePreview, setHasLivePreview] = useState(true); // false: recording only, text arrives on Stop
+
+  // Latest values, readable from async code (saving after the mic has delivered its last words)
   const userAnswerRef = useRef(userAnswer);
   userAnswerRef.current = userAnswer;
+  const currentIndexRef = useRef(currentIndex);
+  currentIndexRef.current = currentIndex;
   const appendToAnswer = (text: string) => {
     setUserAnswer((prev) => {
       const next = prev.trim() ? `${prev.trim()} ${text}` : text;
@@ -207,14 +233,24 @@ export default function InterviewSession({
   };
 
   const startRecording = () => {
+    if (isTranscribing) return; // the previous recording is still being added to the answer
     const SpeechRecognitionImpl =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognitionImpl) {
+    const canRecordAudio = typeof MediaRecorder !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+    if (!SpeechRecognitionImpl && !canRecordAudio) {
       setError("Voice input is not supported in this browser. Please use Google Chrome, or type your answer.");
       return;
     }
 
     setError("");
+    segmentRef.current = {
+      base: userAnswerRef.current.trim(),
+      questionIndex: currentIndex,
+      heardSpeech: false,
+      liveThroughout: !!SpeechRecognitionImpl,
+      typed: false,
+    };
+    setHasLivePreview(!!SpeechRecognitionImpl);
     window.speechSynthesis.cancel(); // don't transcribe the question being read aloud
     wantListeningRef.current = true;
     restartTimesRef.current = [];
@@ -225,7 +261,113 @@ export default function InterviewSession({
     if (timeRef.current) clearInterval(timeRef.current);
     timeRef.current = setInterval(() => setRecordingTime((prev) => prev + 1), 1000);
 
-    startRecognitionSession(SpeechRecognitionImpl);
+    if (canRecordAudio) startAudioCapture(!SpeechRecognitionImpl);
+    if (SpeechRecognitionImpl) startRecognitionSession(SpeechRecognitionImpl);
+  };
+
+  // Record the mic for Gemini transcription. Runs next to the browser's recognition; Chrome lets
+  // both use the microphone at the same time.
+  const startAudioCapture = async (isOnlyInput: boolean) => {
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+      });
+    } catch (err) {
+      console.warn("Could not record microphone audio:", err);
+      // Without the recording the browser's live text is still used; only fail if there is nothing else
+      if (isOnlyInput && wantListeningRef.current) {
+        failVoiceInput("Microphone access is blocked. Please allow microphone access for this site in your browser settings.");
+      }
+      return;
+    }
+    if (!wantListeningRef.current || mediaRecorderRef.current) {
+      stream.getTracks().forEach((t) => t.stop()); // stopped while the mic was being opened
+      return;
+    }
+
+    const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"].find((t) =>
+      MediaRecorder.isTypeSupported(t)
+    );
+    let recorder: MediaRecorder;
+    try {
+      // Low bitrate keeps long answers within the upload limit; plenty for speech
+      recorder = new MediaRecorder(stream, { ...(mimeType ? { mimeType } : {}), audioBitsPerSecond: 32000 });
+      const chunks: Blob[] = [];
+      audioChunksRef.current = chunks;
+      recorder.ondataavailable = (e) => {
+        if (e.data.size) chunks.push(e.data);
+      };
+      recorder.start(1000);
+    } catch (err) {
+      console.warn("Could not start audio recording:", err);
+      stream.getTracks().forEach((t) => t.stop());
+      if (isOnlyInput) failVoiceInput("Voice input could not be started. Please try again, or type your answer.");
+      return;
+    }
+    mediaRecorderRef.current = recorder;
+  };
+
+  // Stop the recorder and hand back everything it recorded
+  const stopAudioCapture = (): Promise<Blob | null> => {
+    const recorder = mediaRecorderRef.current;
+    mediaRecorderRef.current = null;
+    if (!recorder) return Promise.resolve(null);
+    const chunks = audioChunksRef.current;
+    audioChunksRef.current = [];
+    return new Promise((resolve) => {
+      recorder.onstop = () => {
+        recorder.stream.getTracks().forEach((t) => t.stop());
+        resolve(chunks.length ? new Blob(chunks, { type: recorder.mimeType || "audio/webm" }) : null);
+      };
+      try {
+        recorder.stop(); // delivers the last chunk, then fires onstop
+      } catch {
+        recorder.stream.getTracks().forEach((t) => t.stop());
+        resolve(null);
+      }
+    });
+  };
+
+  const transcribeAudio = async (blob: Blob, segment: VoiceSegment): Promise<string | null> => {
+    // Tiny recordings hold no speech; oversized ones would be rejected by the server
+    if (blob.size < 2000 || blob.size > 4 * 1024 * 1024) return null;
+    try {
+      const token = await getToken();
+      const form = new FormData();
+      const ext = blob.type.includes("mp4") ? "mp4" : blob.type.includes("ogg") ? "ogg" : "webm";
+      form.append("audio", blob, `answer.${ext}`);
+      form.append("lang", speechLangRef.current);
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      if (!res.ok) {
+        console.warn("Transcription request failed:", res.status);
+        return null;
+      }
+      const data = await res.json();
+      return typeof data.text === "string" ? data.text : null;
+    } catch (err) {
+      console.warn("Transcription request failed:", err);
+      return null;
+    }
+  };
+
+  // Replace the browser's text for this recording with the accurate one, unless the user has
+  // edited the answer in the meantime (their edits win)
+  const applyTranscript = (segment: VoiceSegment, text: string) => {
+    const spoken = text.trim();
+    if (!spoken) return; // nothing understood: keep whatever the browser heard
+    // The browser listened the whole time and heard no words: the user said nothing, so any text
+    // here would be made up
+    if (segment.liveThroughout && !segment.heardSpeech) return;
+    if (segment.typed || currentIndexRef.current !== segment.questionIndex) return;
+    if (!userAnswerRef.current.trim().startsWith(segment.base)) return;
+    const next = segment.base ? `${segment.base} ${spoken}` : spoken;
+    userAnswerRef.current = next;
+    setUserAnswer(next);
   };
 
   // Add words the browser heard but never finalized (e.g. cut off by a session ending)
@@ -262,6 +404,7 @@ export default function InterviewSession({
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const text = (event.results[i][0]?.transcript ?? "").trim();
         if (!text) continue;
+        if (segmentRef.current) segmentRef.current.heardSpeech = true;
         if (event.results[i].isFinal) {
           appendToAnswer(text);
         } else {
@@ -283,7 +426,17 @@ export default function InterviewSession({
           return; // the session ends next; onend restarts it while the user still wants to listen
         case "network":
           networkRetriesRef.current += 1;
+          // the browser may have missed speech while offline, so its silence proves nothing
+          if (segmentRef.current) segmentRef.current.liveThroughout = false;
           if (networkRetriesRef.current <= 3) return; // onend retries after a short delay
+          if (mediaRecorderRef.current) {
+            // The audio is still being recorded, so keep going without the live preview
+            recognitionRef.current = null; // stops further restarts of the browser recognition
+            if (segmentRef.current) segmentRef.current.liveThroughout = false;
+            setTranscript("");
+            setHasLivePreview(false);
+            return;
+          }
           failVoiceInput(
             "Voice input couldn't reach the browser's speech service. It needs Google Chrome with an internet " +
               "connection, and may be blocked by some browsers (e.g. Brave, the desktop app), VPNs, firewalls or " +
@@ -339,8 +492,16 @@ export default function InterviewSession({
 
   // Stop listening and wait (briefly) until the last words have been added to the answer.
   // Used before saving, so a phrase spoken right before Submit/Next isn't lost.
+  // Also waits for the accurate transcription of the recording, within limits.
   const stopRecordingAndFlush = (): Promise<void> => {
-    if (wantListeningRef.current || recognitionRef.current) stopRecording();
+    if (wantListeningRef.current || recognitionRef.current || mediaRecorderRef.current) stopRecording();
+    const pending = finishRef.current;
+    if (!pending) return Promise.resolve();
+    return Promise.race([pending, new Promise<void>((resolve) => setTimeout(resolve, 25000))]);
+  };
+
+  // Resolves once the stopped browser session has delivered its last words
+  const waitForBrowserFlush = (): Promise<void> => {
     if (!stoppingRecognitionRef.current) return Promise.resolve();
     return new Promise((resolve) => {
       flushWaitersRef.current.push(resolve);
@@ -391,7 +552,7 @@ export default function InterviewSession({
   // Re-assigned every render so it always sees the latest state
   const autoStartRef = useRef<() => void>(() => {});
   autoStartRef.current = () => {
-    if (!autoStartMicRef.current || isRecording || isSubmitting || showSubmitConfirmation) return;
+    if (!autoStartMicRef.current || isRecording || isTranscribing || isSubmitting || showSubmitConfirmation) return;
     if (userAnswer.trim()) return; // already answered: don't start appending to it
     startRecording();
   };
@@ -434,6 +595,30 @@ export default function InterviewSession({
       timeRef.current = null;
     }
     setIsRecording(false);
+
+    // Transcribe the recording, then (after the browser's last words are in, so they can't be
+    // appended on top of it) put the accurate text in place of the browser's
+    const segment = segmentRef.current;
+    segmentRef.current = null;
+    const browserFlushed = waitForBrowserFlush();
+    const audio = stopAudioCapture();
+    if (!segment) return;
+    const finish = (async () => {
+      const blob = await audio;
+      if (!blob) return;
+      setIsTranscribing(true);
+      const text = await transcribeAudio(blob, segment);
+      await browserFlushed;
+      if (text !== null) applyTranscript(segment, text);
+    })()
+      .catch((err) => console.warn("Could not apply transcription:", err))
+      .finally(() => {
+        if (finishRef.current === finish) {
+          finishRef.current = null;
+          setIsTranscribing(false);
+        }
+      });
+    finishRef.current = finish;
   };
 
   // Format recording time
@@ -467,7 +652,10 @@ export default function InterviewSession({
       // The question still being read aloud counts as activity. A mic that is on but hearing nothing
       // does not; spoken words reset the timer through the transcript/answer changes above.
       const readingAloud = typeof window !== "undefined" && window.speechSynthesis?.speaking;
-      if (readingAloud) {
+      // Recording without a live preview can't tell speech from silence, so it counts as activity,
+      // as does the recording being transcribed
+      const recordingOnly = wantListeningRef.current && !!mediaRecorderRef.current && !recognitionRef.current;
+      if (readingAloud || recordingOnly || finishRef.current) {
         questionDeadlineRef.current = Date.now() + QUESTION_TIME_LIMIT_SECONDS * 1000;
       }
       const left = Math.max(0, Math.ceil((questionDeadlineRef.current - Date.now()) / 1000));
@@ -889,7 +1077,7 @@ export default function InterviewSession({
               <button
                 type="button"
                 onClick={handleSpeechToText}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isTranscribing}
                 className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-full cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   isRecording
                     ? "bg-rose-600 hover:bg-rose-700 text-white"
@@ -917,18 +1105,30 @@ export default function InterviewSession({
             <div className="relative">
               <textarea
                 value={userAnswer}
-                onChange={(e) => setUserAnswer(e.target.value)}
+                onChange={(e) => {
+                  // typing while recording: keep the user's edits instead of replacing them with the transcription
+                  if (segmentRef.current) segmentRef.current.typed = true;
+                  setUserAnswer(e.target.value);
+                }}
                 placeholder="Type or record your answer here..."
                 className="w-full min-h-[200px] p-4 bg-[#1e1e2d] border border-[#3a2a3a] rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-[#b87a9c] focus:border-transparent"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isTranscribing}
               />
               {isRecording && (
                 <div className="absolute bottom-2 left-2 right-2 p-2 text-sm rounded bg-black/60">
                   {transcript ? (
                     <span className="italic text-gray-300">{transcript}</span>
-                  ) : (
+                  ) : hasLivePreview ? (
                     <span className="text-gray-500">Listening… speak your answer. Click Stop when you&apos;re done.</span>
+                  ) : (
+                    <span className="text-gray-500">Recording… your words will appear when you click Stop.</span>
                   )}
+                </div>
+              )}
+              {isTranscribing && (
+                <div className="absolute bottom-2 left-2 right-2 flex items-center gap-2 p-2 text-sm text-gray-300 rounded bg-black/60">
+                  <span className="w-3.5 h-3.5 border-2 rounded-full border-gray-400 border-t-transparent animate-spin" />
+                  Improving the transcript of your answer…
                 </div>
               )}
             </div>
@@ -937,7 +1137,7 @@ export default function InterviewSession({
             <button
               type="button"
               onClick={handleSubmitAnswer}
-              disabled={isSubmitting || (!userAnswer.trim() && !transcript)}
+              disabled={isSubmitting || isTranscribing || (!userAnswer.trim() && !transcript && !isRecording)}
               className="w-full py-3 px-6 bg-gradient-to-r from-[#b87a9c] to-[#d8a1bc] text-white font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (

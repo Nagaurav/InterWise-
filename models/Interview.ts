@@ -17,6 +17,8 @@ const questionSchema = new mongoose.Schema({
     technicalFeedback: String,
     communicationFeedback: String,
     improvementSuggestions: [String],
+    // A model answer, shown on the analysis page (also for skipped questions)
+    idealAnswer: String,
   },
 });
 

@@ -1,5 +1,5 @@
 import Interview from "@/models/Interview";
-import { analyzeResponse } from "@/lib/gemini";
+import { analyzeResponse, generateIdealAnswers } from "@/lib/gemini";
 
 /**
  * Recomputes overallScore. While in progress: the average of the answered, analyzed questions.
@@ -82,4 +82,29 @@ export async function analyzeMissingAnswers(interviewId: string) {
       }
     })
   );
+}
+
+/**
+ * Adds a sample ideal answer to every unanswered question (after markUnansweredQuestions), so the
+ * analysis page shows the solution there. Best effort: on failure the questions just have none.
+ */
+export async function addIdealAnswersForUnanswered(interviewId: string) {
+  const interview = await Interview.findById(interviewId);
+  if (!interview) return;
+
+  const skipped = interview.questions
+    .map((q: any, index: number) => ({ q, index }))
+    .filter(({ q }: any) => (!q.answer || !q.answer.trim()) && !q.analysis?.idealAnswer);
+  if (skipped.length === 0) return;
+
+  try {
+    const answers = await generateIdealAnswers(skipped.map(({ q }: any) => q.text));
+    const updates: Record<string, string> = {};
+    skipped.forEach(({ index }: any, i: number) => {
+      if (answers[i]) updates[`questions.${index}.analysis.idealAnswer`] = answers[i];
+    });
+    if (Object.keys(updates).length > 0) await Interview.updateOne({ _id: interviewId }, { $set: updates });
+  } catch (error) {
+    console.error("Could not generate ideal answers for unanswered questions:", error);
+  }
 }
